@@ -6,9 +6,8 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
-import { createClient } from "@/lib/supabase/client"
 import { Loader2 } from "lucide-react"
 
 export function LoginForm() {
@@ -33,27 +32,37 @@ export function LoginForm() {
     }
 
     setIsLoading(true)
-    const supabase = createClient()
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
       })
 
-      if (error) throw error
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Login failed")
+      }
+
+      const data = await response.json()
 
       toast({
         title: "Login Successful",
         description: "Welcome back to Salone Makit!",
       })
 
-      router.push("/")
+      router.push("/dashboard")
       router.refresh()
     } catch (error: any) {
       toast({
         title: "Login Failed",
-        description: error.message || "Invalid email or password",
+        description: error?.message || "Invalid email or password",
         variant: "destructive",
       })
     } finally {
@@ -62,47 +71,71 @@ export function LoginForm() {
   }
 
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="email">Email Address</Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-              placeholder="your.email@example.com"
-              required
-              disabled={isLoading}
-            />
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-500 to-green-500 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md shadow-2xl">
+        <CardHeader className="bg-gradient-to-r from-blue-600 to-green-500 text-white">
+          <CardTitle className="text-2xl">Welcome Back</CardTitle>
+          <p className="text-sm text-blue-100 mt-1">Login to Salone Makit</p>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="email" className="text-sm font-semibold">
+                Email Address
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
+                placeholder="your.email@example.com"
+                required
+                disabled={isLoading}
+                className="mt-1"
+              />
+            </div>
 
-          <div>
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
-              placeholder="Enter your password"
-              required
-              disabled={isLoading}
-            />
-          </div>
+            <div>
+              <Label htmlFor="password" className="text-sm font-semibold">
+                Password
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
+                placeholder="Enter your password"
+                required
+                disabled={isLoading}
+                className="mt-1"
+              />
+            </div>
 
-          <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Logging in...
-              </>
-            ) : (
-              "Login"
-            )}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full bg-gradient-to-r from-blue-600 to-green-500 hover:from-blue-700 hover:to-green-600 text-white font-semibold"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Logging in...
+                </>
+              ) : (
+                "Login"
+              )}
+            </Button>
+
+            <p className="text-center text-sm text-gray-600 mt-4">
+              Don't have an account?{" "}
+              <a href="/signup" className="text-blue-600 hover:text-blue-700 font-semibold">
+                Sign up here
+              </a>
+            </p>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   )
 }

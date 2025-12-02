@@ -1,43 +1,40 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Search } from "lucide-react"
-
-export const metadata = {
-  title: "Manage Users - Admin Panel",
-  description: "View and manage platform users",
-}
-
-const mockUsers = [
-  {
-    id: "1",
-    name: "Aminata Kamara",
-    email: "aminata@example.com",
-    role: "buyer",
-    district: "Western Area",
-    status: "active",
-  },
-  { id: "2", name: "Ibrahim Sesay", email: "ibrahim@example.com", role: "merchant", district: "Bo", status: "active" },
-  {
-    id: "3",
-    name: "Fatmata Koroma",
-    email: "fatmata@example.com",
-    role: "buyer",
-    district: "Kenema",
-    status: "active",
-  },
-  {
-    id: "4",
-    name: "Mohamed Bangura",
-    email: "mohamed@example.com",
-    role: "merchant",
-    district: "Makeni",
-    status: "active",
-  },
-]
+import { Search, Loader2 } from "lucide-react"
 
 export default function AdminUsersPage() {
+  const [users, setUsers] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("")
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch("/api/admin/users")
+        if (!response.ok) throw new Error("Failed to fetch users")
+        const data = await response.json()
+        setUsers(data.users || [])
+      } catch (error) {
+        console.error("[v0] Error fetching users:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchUsers()
+  }, [])
+
+  const filteredUsers = users.filter(
+    (user) =>
+      user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email?.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -45,40 +42,48 @@ export default function AdminUsersPage() {
         <p className="text-muted-foreground">View and manage all platform users</p>
       </div>
 
-      {/* Search */}
       <div className="mb-6">
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search users..." className="pl-9" />
+          <Input
+            placeholder="Search users..."
+            className="pl-9"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
       </div>
 
-      {/* Users List */}
       <Card>
         <CardHeader>
-          <CardTitle>All Users ({mockUsers.length})</CardTitle>
+          <CardTitle>All Users ({filteredUsers.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {mockUsers.map((user) => (
-              <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex-1">
-                  <h3 className="font-semibold">{user.name}</h3>
-                  <p className="text-sm text-muted-foreground">{user.email}</p>
-                  <div className="flex gap-2 mt-2">
-                    <Badge variant={user.role === "merchant" ? "secondary" : "outline"}>{user.role}</Badge>
-                    <Badge variant="outline">{user.district}</Badge>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : filteredUsers.length > 0 ? (
+            <div className="space-y-4">
+              {filteredUsers.map((user) => (
+                <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex-1">
+                    <h3 className="font-semibold">{user.full_name}</h3>
+                    <p className="text-sm text-muted-foreground">{user.email}</p>
+                    <div className="flex gap-2 mt-2">
+                      <Badge variant={user.role === "merchant" ? "secondary" : "outline"}>{user.role}</Badge>
+                      <Badge variant="outline">{user.district}</Badge>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={user.status === "active" ? "secondary" : "destructive"}>{user.status}</Badge>
                   <Button variant="outline" size="sm">
-                    View
+                    View Details
                   </Button>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-muted-foreground py-8">No users found</p>
+          )}
         </CardContent>
       </Card>
     </div>

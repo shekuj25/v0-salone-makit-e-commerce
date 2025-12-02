@@ -1,12 +1,12 @@
 "use client"
 
 import Link from "next/link"
-import { ShoppingCart, Menu, User, LogOut, LogIn } from "lucide-react"
+import { ShoppingCart, Menu, User, LogOut, LogIn, LayoutDashboard } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useCart } from "@/components/cart-provider"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
-import { createClient } from "@/lib/supabase/client"
+import { mockAuth } from "@/lib/mock-auth"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import {
@@ -21,29 +21,22 @@ export function Header() {
   const { items } = useCart()
   const cartCount = items.reduce((sum, item) => sum + item.quantity, 0)
   const [user, setUser] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
-    const supabase = createClient()
+    const loadUser = async () => {
+      const { data } = await mockAuth.getUser()
+      setUser(data?.user ?? null)
+      setIsLoading(false)
+    }
 
-    // Get initial user
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user)
-    })
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-    })
-
-    return () => subscription.unsubscribe()
+    loadUser()
   }, [])
 
   const handleSignOut = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
+    await mockAuth.signOut()
+    setUser(null)
     router.push("/")
     router.refresh()
   }
@@ -85,7 +78,7 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
-          {user ? (
+          {!isLoading && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -99,8 +92,9 @@ export function Header() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-2 py-1.5 text-sm">
-                  <p className="font-medium">{user.user_metadata?.full_name || user.email}</p>
+                  <p className="font-medium">{user.fullName || user.email}</p>
                   <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  <p className="text-xs text-[#0072CE] font-semibold mt-1 capitalize">{user.role}</p>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
@@ -108,10 +102,18 @@ export function Header() {
                     My Account
                   </Link>
                 </DropdownMenuItem>
-                {user.user_metadata?.role === "merchant" && (
+                {user.role === "merchant" && (
                   <DropdownMenuItem asChild>
-                    <Link href="/merchant" className="cursor-pointer">
+                    <Link href="/merchant/dashboard" className="cursor-pointer">
                       Merchant Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {user.role === "admin" && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin" className="cursor-pointer flex items-center gap-2 text-[#0072CE]">
+                      <LayoutDashboard className="h-4 w-4" />
+                      Admin Dashboard
                     </Link>
                   </DropdownMenuItem>
                 )}
@@ -202,13 +204,22 @@ export function Header() {
                         <div className="h-1 w-1 rounded-full bg-[#1EB53A]"></div>
                         My Account
                       </Link>
-                      {user.user_metadata?.role === "merchant" && (
+                      {user.role === "merchant" && (
                         <Link
-                          href="/merchant"
+                          href="/merchant/dashboard"
                           className="text-lg font-medium hover:text-[#F0B429] transition-colors flex items-center gap-2"
                         >
                           <div className="h-1 w-1 rounded-full bg-[#F0B429]"></div>
                           Merchant Dashboard
+                        </Link>
+                      )}
+                      {user.role === "admin" && (
+                        <Link
+                          href="/admin"
+                          className="text-lg font-medium hover:text-[#0072CE] transition-colors flex items-center gap-2"
+                        >
+                          <div className="h-1 w-1 rounded-full bg-[#0072CE]"></div>
+                          Admin Dashboard
                         </Link>
                       )}
                       <button

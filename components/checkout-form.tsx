@@ -89,55 +89,60 @@ export function CheckoutForm() {
         data: { user },
       } = await supabase.auth.getUser()
 
-      const orderNumber = `SM${Date.now().toString().slice(-8)}`
-
-      const orderData = {
-        user_id: user?.id || null,
-        order_number: orderNumber,
-        status: "pending",
-        total_amount: total,
-        currency: "SLL",
-        payment_method: formData.paymentMethod,
-        payment_status: formData.paymentMethod === "cash-on-delivery" ? "pending" : "pending",
-        delivery_district: formData.district,
-        delivery_address: formData.address,
-        delivery_phone: formData.phone,
-        delivery_name: formData.fullName,
-        delivery_email: formData.email,
-        notes: formData.notes || null,
+      if (!user) {
+        toast({
+          title: "Please Login",
+          description: "You must be logged in to place an order",
+          variant: "destructive",
+        })
+        router.push("/login?redirectTo=/checkout")
+        return
       }
 
-      const { data: order, error: orderError } = await supabase.from("orders").insert(orderData).select().single()
+      const response = await fetch("/api/orders/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          items: items.map((item) => ({
+            productId: item.productId,
+            productName: mockProducts.find((p) => p.id === item.productId)?.name_en || "Product",
+            quantity: item.quantity,
+            unitPrice: mockProducts.find((p) => p.id === item.productId)?.price || 0,
+            totalPrice: (mockProducts.find((p) => p.id === item.productId)?.price || 0) * item.quantity,
+          })),
+          totalAmount:
+            items.reduce((sum, item) => {
+              const productPrice = mockProducts.find((p) => p.id === item.productId)?.price || 0
+              return sum + productPrice * item.quantity
+            }, 0) + 10000,
+          paymentMethod: formData.paymentMethod,
+          deliveryDistrict: formData.district,
+          deliveryAddress: formData.address,
+          deliveryPhone: formData.phone,
+          deliveryName: formData.fullName,
+          deliveryEmail: formData.email,
+          notes: formData.notes || null,
+        }),
+      })
 
-      if (orderError) {
-        console.error("[v0] Order creation error:", orderError)
-        throw new Error("Failed to create order")
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to create order")
       }
 
-      const orderItems = cartItems.map((item) => ({
-        order_id: order.id,
-        product_id: item.productId,
-        product_name: item.product!.name_en,
-        quantity: item.quantity,
-        unit_price: item.product!.price,
-        total_price: item.product!.price * item.quantity,
-      }))
+      const { order } = await response.json()
 
-      const { error: itemsError } = await supabase.from("order_items").insert(orderItems)
-
-      if (itemsError) {
-        console.error("[v0] Order items error:", itemsError)
-      }
-
-      await sendOrderNotifications(order.order_number)
+      await sendOrderNotifications(order.orderNumber)
 
       toast({
         title: "Order Placed Successfully!",
-        description: `Order #${order.order_number}. Check your email and phone for updates.`,
+        description: `Order #${order.orderNumber}. Check your email and phone for updates.`,
       })
 
       clearCart()
-      localStorage.setItem("last-order-number", order.order_number)
+      localStorage.setItem("last-order-number", order.orderNumber)
       router.push("/order-confirmation")
     } catch (error: any) {
       console.error("[v0] Order completion error:", error)
@@ -157,7 +162,12 @@ export function CheckoutForm() {
       {
         time: "Immediate",
         type: "SMS & Email",
-        message: `Order #${orderNumber} confirmed! Your order has been received and is being processed. Total: ${formatPrice(total)}`,
+        message: `Order #${orderNumber} confirmed! Your order has been received and is being processed. Total: ${formatPrice(
+          items.reduce((sum, item) => {
+            const productPrice = mockProducts.find((p) => p.id === item.productId)?.price || 0
+            return sum + productPrice * item.quantity
+          }, 0) + 10000,
+        )}`,
       },
       {
         time: "After payment (if prepaid)",
